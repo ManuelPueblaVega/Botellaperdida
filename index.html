@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>¡Devolver Botella Perdida! 🌍</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .animate-pulse { animation: pulse 2s infinite; }
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-100 to-indigo-200 min-h-screen flex items-center justify-center p-4">
+    <!-- Loading overlay -->
+    <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+        <div class="bg-white p-6 rounded-lg flex items-center space-x-3">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <span>Obteniendo ubicación...</span>
+        </div>
+    </div>
+
+    <!-- Confirmation modal -->
+    <div id="confirmation" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+        <div class="bg-white p-6 rounded-lg text-center">
+            <p class="text-xl font-semibold mb-4">¡Ubicación enviada! 🎉</p>
+            <button onclick="hideConfirmation()" 
+                    class="bg-blue-500 text-white px-4 py-2 rounded-lg">
+                Cerrar
+            </button>
+        </div>
+    </div>
+
+    <!-- Main content -->
+    <div class="max-w-md w-full bg-white rounded-2xl shadow-xl p-6 text-center space-y-6">
+        <div class="space-y-4">
+            <div class="text-7xl">🌊</div>
+            <h1 class="text-3xl font-bold text-gray-800">¡Botella Encontrada!</h1>
+            <p class="text-gray-600">Por favor ayuda a devolver esta botella a su dueño</p>
+        </div>
+
+        <!-- iOS instructions -->
+        <div id="ios-warning" class="hidden bg-yellow-50 p-3 rounded-lg text-yellow-800 text-sm"></div>
+
+        <!-- Map preview -->
+        <div id="map-container" class="w-full h-48 rounded-lg overflow-hidden"></div>
+
+        <!-- Contact options -->
+        <div class="space-y-4">
+            <p class="text-sm text-gray-500">Selecciona cómo quieres contactar:</p>
+            
+            <a id="whatsappBtn" href="#" class="block animate-pulse bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-full text-lg font-medium transition-all">
+                📱 Contactar por WhatsApp
+            </a>
+            
+            <a id="emailBtn" href="#" class="block animate-pulse bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-full text-lg font-medium transition-all">
+                ✉️ Contactar por Email
+            </a>
+        </div>
+
+        <!-- Location history -->
+        <div class="mt-6 text-left">
+            <h3 class="font-medium mb-2">Últimos intentos de entrega:</h3>
+            <div id="locationHistory" class="space-y-2 text-sm"></div>
+        </div>
+
+        <!-- Privacy notice -->
+        <p class="text-xs text-gray-400 mt-4">
+            Al usar esta aplicación, aceptas compartir tu ubicación temporalmente para facilitar la devolución. 
+            Los datos se eliminan automáticamente después de 24 horas.
+        </p>
+    </div>
+
+    <script>
+        // Estado inicial
+        let currentLocation = null;
+        
+        // Elementos UI
+        const loading = document.getElementById('loading');
+        const confirmation = document.getElementById('confirmation');
+        const iosWarning = document.getElementById('ios-warning');
+        const mapContainer = document.getElementById('map-container');
+        const locationHistory = document.getElementById('locationHistory');
+
+        // Funciones UI
+        function showLoading(show) {
+            loading.classList.toggle('hidden', !show);
+        }
+
+        function showConfirmation() {
+            confirmation.classList.remove('hidden');
+        }
+
+        function hideConfirmation() {
+            confirmation.classList.add('hidden');
+        }
+
+        // Geolocalización
+        function getLocation() {
+            showLoading(true);
+            
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            };
+
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    currentLocation = position;
+                    updateLinks(position);
+                    showMapPreview(position.coords);
+                    updateHistory(position.coords);
+                    showLoading(false);
+                    checkiOS();
+                },
+                error => {
+                    showLoading(false);
+                    handleGeoError(error);
+                },
+                options
+            );
+        }
+
+        // Actualizar enlaces
+        function updateLinks(position) {
+            const lat = position.coords.latitude.toFixed(6);
+            const lon = position.coords.longitude.toFixed(6);
+            const locationText = `Mi ubicación: https://www.google.com/maps?q=${lat},${lon}`;
+            
+            // WhatsApp
+            const whatsappMsg = `¡Encontré tu botella! ${locationText}`;
+            const whatsappBtn = document.getElementById('whatsappBtn');
+            whatsappBtn.href = `https://wa.me/34608276567?text=${encodeURIComponent(whatsappMsg)}`;
+            
+            // Email
+            const emailSubject = 'Botella encontrada';
+            const emailBody = `Hola Manuel,\n\nEncontré tu botella. ${locationText}\n\nSaludos,`;
+            document.getElementById('emailBtn').href = 
+                `mailto:manuel.puebla.v@gmail.com?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+        }
+
+        // Mapa interactivo
+        function showMapPreview(coords) {
+            mapContainer.innerHTML = `
+                <iframe 
+                    src="https://www.openstreetmap.org/export/embed.html?bbox=${coords.longitude-0.01},${coords.latitude-0.01},${coords.longitude+0.01},${coords.latitude+0.01}&layer=mapnik&marker=${coords.latitude},${coords.longitude}" 
+                    class="w-full h-full"
+                    frameborder="0">
+                </iframe>
+            `;
+        }
+
+        // Historial de ubicaciones
+        function updateHistory(coords) {
+            const history = JSON.parse(localStorage.getItem('bottleAttempts') || '[]');
+            history.push({
+                timestamp: new Date().toISOString(),
+                coordinates: { 
+                    lat: coords.latitude.toFixed(4),
+                    lon: coords.longitude.toFixed(4)
+                }
+            });
+            
+            localStorage.setItem('bottleAttempts', JSON.stringify(history.slice(-5)));
+            
+            // Mostrar historial
+            locationHistory.innerHTML = history
+                .reverse()
+                .map(entry => `
+                    <div class="p-2 bg-gray-50 rounded">
+                        <span class="text-gray-500">${new Date(entry.timestamp).toLocaleString()}:</span>
+                        <a href="https://maps.google.com?q=${entry.coordinates.lat},${entry.coordinates.lon}" 
+                           target="_blank" 
+                           class="text-blue-500 hover:underline">
+                            Ver en mapa
+                        </a>
+                    </div>
+                `)
+                .join('');
+        }
+
+        // Manejo de errores
+        function handleGeoError(error) {
+            let message = '';
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    message = "Permiso de ubicación denegado. Por favor habilítalo en tu navegador.";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    message = "La información de ubicación no está disponible.";
+                    break;
+                case error.TIMEOUT:
+                    message = "Tiempo de espera agotado. Intenta nuevamente.";
+                    break;
+                default:
+                    message = "Error desconocido al obtener la ubicación.";
+            }
+            alert(message);
+        }
+
+        // Detectar iOS
+        function checkiOS() {
+            if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+                iosWarning.classList.remove('hidden');
+                iosWarning.innerHTML = `
+                    📱 iOS: Asegúrate de tener activada la ubicación en:<br>
+                    Ajustes > Privacidad > Localización > Safari
+                `;
+            }
+        }
+
+        // Event listeners
+        document.getElementById('whatsappBtn').addEventListener('click', function(e) {
+            if (!navigator.userAgent.match(/Android|iPhone/)) {
+                e.preventDefault();
+                window.open(this.href, '_blank');
+            }
+            showConfirmation();
+        });
+
+        document.getElementById('emailBtn').addEventListener('click', showConfirmation);
+
+        // Iniciar
+        document.addEventListener('DOMContentLoaded', getLocation);
+    </script>
+</body>
+</html>
